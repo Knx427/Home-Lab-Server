@@ -1,23 +1,15 @@
-# Home Lab Setup Documentation
-![Status](https://img.shields.io/badge/Home%20Lab-Server-blueviolet?style=flat-square)
+# 🛡️ Hardened Linux Server Infrastructure & Secure Remote Access
 
-Welcome to my Home Lab server setup documentation!   
-I used an old laptop with Ubuntu Server LTS.
+## Project Architecture
+Deployed a dedicated, self-hosted Linux server architecture leveraging repurposed hardware running **Ubuntu Server 22.04 LTS (Minimal Infrastructure)**. The core objective of this project was to establish a resilient web service hosting environment while engineering around real-world Layer 3 networking limitations (CGNAT) and automated perimeter threats.
 
-**OS**: Ubuntu Server 22.04 LTS (Minimal install, with Snap + OpenSSH)
+## 📁 Technical Documentation Directory
+*   **[Network Engineering (Netplan)](netplan-config.md):** Configuration files for dynamic interface routing, persistent static IP addressing, and secondary wireless interface backhaul failovers.
+*   **[Host Hardening & SSH Security](ssh-setup.md):** Mitigation of unauthorized remote access vectors through enforced cryptographic Key-Based Authentication, disabled root logins, custom port mapping, and system-level alerts.
+*   **[Active Defense & Perimeter Protection](port-forwarding_and_firewall.md):** Implementation of an aggressive perimeter security layer using Uncomplicated Firewall (UFW) and system log monitoring (Fail2Ban) to isolate malicious scanners.
+*   **[Application Deployment (Nextcloud)](nextcloud.md):** Hardening data storage application access via restricted trusted domain parsing and enforced Multi-Factor Authentication (2FA) enforcement.
+*   **[Network Bypass & Egress Tunneling](ngrok-setup.md):** Architectural implementation of reverse egress tunneling (Ngrok) to bypass Carrier-Grade NAT (CGNAT) topologies without standard inbound router port configuration.
 
-## Contents
-
-- [Installation](setup-installation.md) — Bootable USB stick & installation
-- [Netplan Config](netplan-config.md) — Static IP and WiFi setup
-- [SSH + email Setup](ssh-setup.md) — Key-based SSH access and security tips  
-- [Port Forwarding & Firewall](port-forwarding.md) — Router setup and UFW/Fail2Ban
-- [Nextcloud Config](nextcloud.md) — Trusted domains configuration + Login / 2FA Setup
-- [Ngrok Setup](ngrok-setup.md) — Remote SSH access bypassing CGNAT  
-
----
-
-## Usage
-
-Browse each file for detailed how-tos and configs.  
-Feel free to fork and improve!
+## 🚨 Architectural Lessons Learned (The CGNAT Problem)
+*   **Vulnerability Detection:** Running a public egress proxy (Ngrok) successfully bypassed ISP-enforced CGNAT restrictions but introduced significant automated reconnaissance traffic (botnets).
+*   **Dynamic Defense Mitigation:** Utilized aggressive firewall controls to parse inbound application traffic and mitigate automated malicious login attempts at the edge.
