@@ -1,122 +1,147 @@
+### 🌐 Edge Routing: Bypassing CGNAT via Public Reverse Egress Tunnels (Legacy Setup)
 
-# ngrok Setup for Remote SSH Access Behind CGNAT Domain & Systemd Boot Script
+This document details the configuration, automation scripting, and systemd deployment required to establish an outbound reverse tunneling architecture using Ngrok. This setup was engineered to expose internal HTTP and TCP services (Nextcloud and SSH management planes) over an ISP-enforced Carrier-Grade NAT (CGNAT) perimeter. 
 
-This guide walks you through setting up ngrok to automatically start at boot with a static domain and log the public address.
+[!WARNING]
+**Architectural Exposure & Threat Intelligence Notice:**
+Exposing internal host infrastructure directly to the public internet using generic reverse proxies (Ngrok subdomains) removes perimeter boundary controls. Within hours of establishing these open ingress vectors, local SIEM monitoring (Wazuh/Fail2ban) registered a dramatic spike in automated malicious reconnaissance probes, brute-force dictionary attacks, and widespread botnet scanning. 
 
-## Why ngrok?
+*Service Tier Security Analysis:* It is critical to note that this exposure is an inherent limitation of the **Ngrok Free Service Tier**, not a failure of Ngrok as an enterprise service platform. The free tier lacks native ingress filtering, meaning any automated internet scanner can hit your tunnel endpoint directly. Paid enterprise tiers mitigate this risk entirely by embedding critical edge defense layers—such as mandatory IP Whitelisting, Geo-blocking, and native OpenID Connect (OIDC) / OAuth identity provider integrations—blocking malicious traffic at Ngrok's edge before it ever traverses the egress tunnel into your home network. 
 
-- ISP CGNAT blocks inbound port forwarding.
-- ngrok creates a secure tunnel through its servers.
-- Easy remote access without router changes.
----
+*Architectural Evolution:* Because the free service tier provided insufficient edge filtering for this specific deployment, the topology was deprecated in favor of a private, identity-driven WireGuard mesh overlay network. For details on the hardened architecture, see the **Tailscale Integration & Mesh Network Migration Log**. 
 
-## 1. Installation (if not already installed)
+### 🛠️ 1. Infrastructure Requirements & Ingestion Initialization
+
+### ✅ Architectural Impact
+
+* **Outbound Egress Traversal:** Initiates a persistent outbound TCP handshake to Ngrok's public relays. This creates a bi-directional tunnel, bypassing local router port-forwarding restrictions and CGNAT boundaries completely.
+
+### Installation & Client Provisioning
+
+Deploy the foundational tunnel client software natively via the primary package tree: 
 
 ```bash
+
 sudo apt install ngrok -y
-```
-## Setup
 
-1. Sign up at https://ngrok.com and get your Auth Token & static Domain.
-2. Authenticate ngrok:
+```
+
+1. Secure an active account profile via the administrative panel ([ngrok.com](ngrok.com)) to acquire a unique host authorization token and static subdomain reservation.
+2. Inject the cryptographic identifier into the local environment to authenticate your agent runtime:
 
 ```bash
+
 ngrok authtoken YOUR_AUTH_TOKEN
+
 ```
 
----
+### 📁 2. Central Tunnel Manifest Engineering (ngrok.yml)
 
-## 📁 2. Ngrok Configuration (`ngrok.yml`)
-### Note: You should have configured Nextcloud to continue with the steps below, see [nextcloud-config](nextcloud.md)        
-         
----
+[!NOTE]
+Ensure the underlying Nextcloud storage application framework has been primed to receive incoming HTTP host traffic distributions before initializing the tunnel routing matrix. 
 
-Edit or create this config:
+Open the structural configuration layout stored inside the snap profile boundary workspace: 
 
 ```bash
+
 sudo nano ~/snap/ngrok/current/.config/ngrok/ngrok.yml
+
 ```
 
-Example content:
+Inject the multi-tunnel definition matrix. This file defines simultaneous ingestion endpoints for web application routing and secure shell multiplexing: 
 
 ```yaml
+
 version: 3
 tunnels:
     nextcloud:
-        proto: http  # proto only accepts http, configure the port for https
-        addr: 80  # 443 for https 
+        proto: http
+        addr: 80
         domain: [Your-static-Domain-Name].ngrok-free.app
-        auth: "[Username]:[Password]" # You can add an extra Protection Layer redirecting to an login screen before allowing passage
+        auth: "Username:Password" # Secondary HTTP Basic Auth validation gate protecting the application boundary
     ssh:
         proto: tcp
-        addr: 5555  # Your SSH port
+        addr: 5555 # Hardened local non-standard SSH listener port
 agent:
-    authtoken: [Your-Auth-Token]  # Should already be there because of previous step
+    authtoken: [Your-Auth-Token]
+
 ```
 
-Replace values accordingly.
+### Sandbox Runtime Evaluation
 
-Test it:
+Validate syntax configurations and initialize the tunnel arrays manually before committing to a persistent background service state: 
 
 ```bash
+
 ngrok start --all --config ~/snap/ngrok/current/.config/ngrok/ngrok.yml
-```
-Use the forwarded address to connect remotely:
-```bash
-ssh youruser@0.tcp.ngrok.io -p PORT
-```
-and test in your browser your domain:  
 
 ```
-http[s]://[Your-Static-Domain-Name].ngrok-free.app
-```
----
 
-## 📜 3. Startup notify Script
-
-Create a script to fetch urls and send them to your email:
+Verify secure remote connectivity over the public TCP relay and browser interfaces: 
 
 ```bash
+
+# Terminal SSH Verification Tunnel Cross
+ssh youruser@0.tcp.ngrok.io -p [ASSIGNED_EXTERNAL_PORT]
+
+# Web GUI Verification Ingress 
+http://[Your-Static-Domain-Name].ngrok-free.app
+
+```
+
+### 📜 3. Automated Telemetry Parsing & Notification Scripting
+
+Because Ngrok assigns dynamic port mappings randomly to TCP/SSH streams upon initial boot execution, a shell script was compiled to query the agent's internal administrative API, harvest the dynamic parameters via jq, and email the data straight to the administrator. 
+
+Create the automation utility at ```~/bin/ngrok-notify.sh```: 
+
+```bash
+
 sudo nano ~/bin/ngrok-notify.sh
+
 ```
 
-Contents:
-
 ```bash
+
 #!/bin/bash
 
-# Wait for ngrok to fully initialize
+# Hold script execution to allow the ngrok core daemon to negotiate handshakes completely
 sleep 10
 
-# Get ngrok public URLs
+# Query the local agent api loopback loop to scrape public connection strings
 URLS=$(curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[] | .public_url')
 
-# Save to a file (optional)
+# Persist active string maps to a local directory for monitoring verification
 echo "$URLS" > "$HOME/ngrok_urls.txt"
 
-# Send email with the URLs
-echo -e "Ngrok tunnels are up:\n\n$URLS" | mail -s "Ngrok URLs for SSH & Nextcloud" [your@email.com]
+# Forward live connectivity coordinates to the centralized operations email account
+echo -e "Ngrok tunnels are up:\n\n$URLS" | mail -s "Ngrok Public Routing Strings: SSH & Nextcloud" your@email.com
 
 ```
 
-Make it executable:
+Apply operational file-system execution constraints to the automation binary: 
 
 ```bash
+
 chmod +x ~/bin/ngrok-notify.sh
 ```
 
----
+### ⚙️ 4. Systemd Service Orchestration
 
-## ⚙️ 4. Create systemd  Services
+To ensure persistent system uptime, link recovery, and hands-free initialization at system boot, establish dual dependent initialization definitions inside the system initialization hierarchy. 
 
-Create the `ngrok.service`:
+### Service 1: The Core Ingress Tunnel Engine (ngrok.service)
+
 ```bash
+
 sudo nano /etc/systemd/system/ngrok.service
+
 ```
-Content:
-```bash
+
+```ini
+
 [Unit]
-Description=Ngrok Tunnel for SSH and Nextcloud
+Description=Ngrok Tunnel Infrastructure for SSH and Nextcloud Services
 After=network-online.target
 Wants=network-online.target
 
@@ -124,28 +149,31 @@ Wants=network-online.target
 ExecStart=/snap/ngrok/current/ngrok start --all --config=/home/[user]/snap/ngrok/current/.config/ngrok/ngrok.yml
 WorkingDirectory=/home/[user]
 Restart=on-failure
+RestartSec=5
 User=[user]
 
 [Install]
 WantedBy=multi-user.target
 
 ```
-Create a one-shot service:
+
+### Service 2: The One-Shot Ingest Notification Trigger (ngrok-notify.service)
 
 ```bash
+
 sudo nano /etc/systemd/system/ngrok-notify.service
+
 ```
 
-Contents:
-
 ```ini
+
 [Unit]
-Description=Send ngrok URLs via email after tunnels are up
-After=ngrok.service  # Runs only when ngrok.service is active 
+Description=Automated Telemetry Dispatcher - Scrape and Forward Public URLs
+After=ngrok.service
 Requires=ngrok.service
 
 [Service]
-ExecStart=/home/[user]/ngrok_notify.sh
+ExecStart=/home/[user]/bin/ngrok-notify.sh
 Type=oneshot
 User=[user]
 
@@ -154,27 +182,31 @@ WantedBy=multi-user.target
 
 ```
 
-Enable and start:
+### Registering and Spawning the Infrastructure Daemons
+
+Reload the system supervisor kernel, commit the systemd configurations, and hook the services into the default multi-user target array: 
 
 ```bash
-sudo systemctl daemon-reexec
+
 sudo systemctl daemon-reload
-sudo systemctl enable ngrok.service
-sudo systemctl enable ngrok-notify.service
-sudo systemctl start ngrok.service
-sudo systemctl start ngrok-notify.service
+sudo systemctl enable --now ngrok.service
+sudo systemctl enable --now ngrok-notify.service
+
 ```
 
----
+### 🔍 5. Infrastructure Auditing & Daemon Verification
 
-## 🔍 5. Monitor and Log Output
+Verify the active runtime state and pid socket tracking mapping tables directly from the system process landscape: 
 
 ```bash
-systemctl status ngrok.service
-ps -ef | grep ngrok  # You should see one PID with the ngrok.service execution path
-```
 
----
-Done! Ngrok will now tunnel your Nextcloud via your free static domain and auto-start at boot + You get the URLs sent to your email.
-## Note
-- Never Share your public Ngrok domain/URLs!
+# Check the operational health of the background tunnel workers
+systemctl status ngrok.service --no-pager
+
+# Cross-examine operational PIDs running out of the system binary root
+ps -ef | grep ngrok
+
+```
+### 📝 6. Operational Risk Mitigation Notes
+
+* **Data Confidentiality Rules:** Public endpoint routing strings (ngrok-free.app / 0.tcp.ngrok.io) serve as discoverable paths. Never expose these unique links in public spaces, forums, or open documentation logs to prevent automated malicious reconnaissance campaigns.
